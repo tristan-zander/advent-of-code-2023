@@ -1,7 +1,7 @@
 use clap::Parser;
 use macros::solutions;
 
-mod day_1;
+mod day_one;
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
@@ -15,7 +15,7 @@ pub struct Args {
 pub type Solution = fn(Args) -> ();
 
 const SOLUTIONS: phf::Map<&'static str, Solution> = solutions![
-    mod day_1;
+    mod day_one;
 ];
 
 fn main() {
