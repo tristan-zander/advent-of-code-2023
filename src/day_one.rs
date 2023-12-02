@@ -62,7 +62,7 @@ impl FromStr for NumberLike {
 
             if !TREE.contains_key(&c) {
                 println!("Invalid character {}", c);
-            next += 1;
+                next += 1;
                 continue;
             }
 
