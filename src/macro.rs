@@ -38,14 +38,16 @@ pub fn solutions(stream: TokenStream) -> TokenStream {
                 ident
             )
         })
-        .reduce(|acc, e| format!("{},\n{}", acc, e)).unwrap().parse().unwrap();
-
+        .reduce(|acc, e| format!("{},\n{}", acc, e))
+        .unwrap()
+        .parse()
+        .unwrap();
 
     let expanded = quote! {
         ::phf::phf_map! {
             #modules
         }
     };
-    
+
     return TokenStream::from(expanded);
 }
