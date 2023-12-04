@@ -69,7 +69,7 @@ fn find_numbers_around_symbol(input: &Vec<Vec<char>>, symbol_index: (usize, usiz
     return nums;
 }
 
-fn get_all_product_numbers() -> Vec<u32> {
+pub fn part_one(_args: Args) {
     let input = INPUT
         .split('\n')
         .map(|l| l.chars().collect::<Vec<_>>())
@@ -91,12 +91,30 @@ fn get_all_product_numbers() -> Vec<u32> {
         }
     }
 
-    return nums;
+    println!("Sum: {}", nums.into_iter().sum::<u32>());
 }
 
-pub fn part_one(_args: Args) {
-    let product_nums = get_all_product_numbers();
-    println!("Sum: {}", product_nums.into_iter().sum::<u32>());
-}
+pub fn part_two(_args: Args) {
+    let input = INPUT
+        .split('\n')
+        .map(|l| l.chars().collect::<Vec<_>>())
+        .collect::<Vec<_>>();
 
-pub fn part_two(_args: Args) {}
+    let mut gears = vec![];
+    for (i, line) in input.iter().enumerate() {
+        for (j, letter) in line.iter().enumerate() {
+            if *letter != '*' {
+                continue;
+            }
+
+            let nums = find_numbers_around_symbol(&input, (i, j));
+            if nums.len() != 2 {
+                continue;
+            }
+
+            gears.push(nums[0] * nums[1]);
+        }
+    }
+
+    println!("Sum: {}", gears.into_iter().sum::<u32>());
+}
