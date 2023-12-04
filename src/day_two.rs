@@ -7,6 +7,7 @@ const DESIRED_COMBINATION: ColorSet = ColorSet {
     blue: 14,
 };
 
+#[derive(Debug)]
 struct ColorSet {
     red: u32,
     green: u32,
@@ -23,6 +24,7 @@ impl ColorSet {
     }
 }
 
+#[derive(Debug)]
 struct Game {
     pub index: u32,
     pub sets: Vec<ColorSet>,
@@ -128,4 +130,31 @@ pub fn part_one(_args: Args) {
     println!("sum {}", sum);
 }
 
-pub fn part_two(_args: Args) {}
+pub fn part_two(_args: Args) {
+    let games = parse();
+
+    let sum: u32 = games
+        .iter()
+        .map(|g| {
+            let mut lowest = ColorSet::new();
+
+            for set in &g.sets {
+                if lowest.blue < set.blue {
+                    lowest.blue = set.blue;
+                }
+                if lowest.red < set.red {
+                    lowest.red = set.red;
+                }
+                if lowest.green < set.green {
+                    lowest.green = set.green;
+                }
+            }
+
+            let power = lowest.green * lowest.blue * lowest.red;
+            println!("Power: {}, {:?}", power, lowest);
+            power
+        })
+        .sum();
+
+    println!("sum {}", sum);
+}
