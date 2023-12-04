@@ -1,16 +1,20 @@
-use std::{collections::HashSet, str::FromStr};
+use std::{
+    collections::{HashMap, HashSet},
+    str::FromStr,
+};
 
 use crate::Args;
 
 const FILE_CONTENTS: &'static str = include_str!("../inputs/day_four.txt");
 
 struct Card {
-    pub _index: u32,
+    pub index: u32,
     pub points: u32,
+    pub matches: u32,
 }
 
 impl Card {
-    fn get_points_from_scratchcard(scratchcard: &str) -> u32 {
+    fn get_matches(scratchcard: &str) -> u32 {
         let mut sides = scratchcard.split('|').map(|s| s.trim());
         let answer_side = sides.next().unwrap();
         let numbers_side = sides.next().unwrap();
@@ -36,12 +40,7 @@ impl Card {
 
             matches += 1;
         }
-
-        if matches == 0 {
-            return matches;
-        }
-
-        return 2_u32.pow(matches - 1);
+        return matches;
     }
 }
 
@@ -64,11 +63,18 @@ impl FromStr for Card {
         }
 
         let scratchcard = s.get(semicolon_idx + 1..).unwrap();
-        println!("scratchcard: '{}'", scratchcard);
-        let points = Card::get_points_from_scratchcard(scratchcard);
+        let matches = Card::get_matches(scratchcard);
 
-        println!("Card {}: {} points", index, points);
-        return Ok(Self { _index: index, points });
+        let mut points = 0;
+        if matches != 0 {
+            points = 2_u32.pow(matches - 1);
+        }
+
+        return Ok(Self {
+            index,
+            points,
+            matches,
+        });
     }
 }
 
@@ -81,4 +87,30 @@ pub fn part_one(_args: Args) {
     println!("Sum: {}", sum);
 }
 
-pub fn part_two(_args: Args) {}
+pub fn part_two(_args: Args) {
+    let cards = FILE_CONTENTS
+        .lines()
+        .map(|line| line.parse::<Card>().unwrap())
+        .collect::<Vec<_>>();
+
+    let mut counter = (1..=cards.len())
+        .map(|index| (index as u32, 1_u32))
+        .collect::<HashMap<_, _>>();
+
+    for card in cards {
+        let num_copies = *counter.get(&card.index).unwrap();
+        println!("Card {} has {} copies", card.index, num_copies);
+
+        (1..=card.matches).for_each(|num| {
+            println!("Card {} has match for card {}", card.index, card.index + num);
+            counter.insert(
+                num + card.index,
+                counter.get(&(card.index + num)).unwrap() + num_copies,
+            );
+            println!("Card {} has counter of {}", num + card.index, counter.get(&(card.index + num)).unwrap());
+        });
+    }
+
+    let total_scratchcards = counter.values().cloned().reduce(|acc, x| acc + x).unwrap();
+    println!("Total: {}", total_scratchcards);
+}
