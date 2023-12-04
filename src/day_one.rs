@@ -71,7 +71,6 @@ impl FromStr for NumberLike {
 
             match entry {
                 TreeEntry::InnerTree(btree) => {
-                    let mut node: &BTreeMap<_, _> = &btree;
                     println!("Entry was tree");
                     node = btree;
 
