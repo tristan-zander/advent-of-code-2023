@@ -102,12 +102,20 @@ pub fn part_two(_args: Args) {
         println!("Card {} has {} copies", card.index, num_copies);
 
         (1..=card.matches).for_each(|num| {
-            println!("Card {} has match for card {}", card.index, card.index + num);
+            println!(
+                "Card {} has match for card {}",
+                card.index,
+                card.index + num
+            );
             counter.insert(
                 num + card.index,
                 counter.get(&(card.index + num)).unwrap() + num_copies,
             );
-            println!("Card {} has counter of {}", num + card.index, counter.get(&(card.index + num)).unwrap());
+            println!(
+                "Card {} has counter of {}",
+                num + card.index,
+                counter.get(&(card.index + num)).unwrap()
+            );
         });
     }
 

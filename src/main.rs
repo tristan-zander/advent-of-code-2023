@@ -1,10 +1,10 @@
 use clap::Parser;
 use macros::solutions;
 
-mod day_one;
-mod day_two;
-mod day_three;
 mod day_four;
+mod day_one;
+mod day_three;
+mod day_two;
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
