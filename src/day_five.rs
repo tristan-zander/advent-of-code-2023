@@ -1,6 +1,7 @@
-use std::{error::Error, fmt::Display, ops::Range, str::FromStr};
+use std::{collections::HashMap, fmt::Display, ops::Range, str::FromStr};
 
-use prettytable::{Table, row};
+use itertools::Itertools;
+use prettytable::{row, Table};
 
 use crate::Args;
 
@@ -65,8 +66,8 @@ impl FromStr for SourceDestinationMap {
                     .split_whitespace()
                     .map(|num| num.parse().unwrap())
                     .collect::<Vec<_>>();
-                let source = numbers[0];
-                let dest = numbers[1];
+                let dest = numbers[0];
+                let source = numbers[1];
                 let length = numbers[2];
                 SourceDestination::new(source, dest, length)
             })
@@ -79,8 +80,19 @@ impl FromStr for SourceDestinationMap {
 }
 
 #[derive(Default, Debug, Clone)]
+struct SeedData {
+    pub soil: u64,
+    pub fertilizer: u64,
+    pub water: u64,
+    pub light: u64,
+    pub temperature: u64,
+    pub humidity: u64,
+    pub location: u64,
+}
+
+#[derive(Default, Debug, Clone)]
 struct DayFive {
-    pub seeds: Vec<u64>,
+    seeds: Vec<u64>,
     seed_to_soil: SourceDestinationMap,
     soil_to_fertilizer: SourceDestinationMap,
     fertilizer_to_water: SourceDestinationMap,
@@ -88,6 +100,7 @@ struct DayFive {
     light_to_temperature: SourceDestinationMap,
     temperature_to_humidity: SourceDestinationMap,
     humidity_to_location: SourceDestinationMap,
+    table: HashMap<u64, SeedData>,
 }
 
 impl DayFive {
@@ -98,22 +111,83 @@ impl DayFive {
     }
 }
 
-impl Display for DayFive {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let mut table = Table::new();
-        table.add_row(row!["seed", "soil", "fertilizer", "water", "light", "temperature", "humidity", "location"]);
+impl DayFive {
+    pub fn with_seed_ranges(mut self) -> Self {
+        let mut seed_iter = self.seeds.iter();
 
-        for seed in &self.seeds {
-            let soil = self.seed_to_soil.get_destination_value(*seed);
+        let mut new_seeds = vec![];
+        while let Some((start, length)) = seed_iter.next_tuple() {
+            new_seeds.extend(*start..(start + *length));
+        }
+        self.seeds = new_seeds;
+        self.table.clear();
+        self
+    }
+
+    pub fn seed_data(&self, seed: u64) -> SeedData {
+            let soil = self.seed_to_soil.get_destination_value(seed);
             let fertilizer = self.soil_to_fertilizer.get_destination_value(soil);
             let water = self.fertilizer_to_water.get_destination_value(fertilizer);
             let light = self.water_to_light.get_destination_value(water);
             let temperature = self.light_to_temperature.get_destination_value(light);
-            let humidity = self.temperature_to_humidity.get_destination_value(temperature);
+            let humidity = self
+                .temperature_to_humidity
+                .get_destination_value(temperature);
             let location = self.humidity_to_location.get_destination_value(humidity);
-            table.add_row(row![seed, soil, fertilizer, water, light, temperature, humidity, location]);
+                SeedData {
+                    soil,
+                    fertilizer,
+                    water,
+                    light,
+                    temperature,
+                    humidity,
+                    location,
+                }
+    }
+
+    pub fn calculate_table(&mut self) {
+        for seed in &self.seeds {
+            let seed_data = self.seed_data(*seed);
+            self.table.insert(
+                *seed,
+                seed_data
+            );
         }
-        
+    }
+
+    pub fn lowest_location(&self) -> Option<u64> {
+        self.seeds.iter().map(|s| self.seed_data(*s).location).min()
+    }
+}
+
+impl Display for DayFive {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut table = Table::new();
+        table.add_row(row![
+            "seed",
+            "soil",
+            "fertilizer",
+            "water",
+            "light",
+            "temperature",
+            "humidity",
+            "location"
+        ]);
+
+        for (seed, data) in &self.table {
+            table.add_row(row![
+                seed,
+                data.soil,
+                data.fertilizer,
+                data.water,
+                data.light,
+                data.temperature,
+                data.humidity,
+                data.location
+            ]);
+        }
+
+        write!(f, "Number of seeds: {}\n", self.seeds.len())?;
         write!(f, "{}", table)
     }
 }
@@ -172,6 +246,8 @@ impl FromStr for DayFive {
             }
         }
 
+        day_five.calculate_table();
+
         Ok(day_five)
     }
 }
@@ -179,6 +255,22 @@ impl FromStr for DayFive {
 pub fn part_one(args: Args) {
     let day_five: DayFive = FILE_CONTENTS.parse().unwrap();
     println!("{}", day_five);
+    println!(
+        "Lowest Location: {}",
+        day_five
+            .lowest_location()
+            .ok_or_else(|| anyhow!("no location data found"))
+            .unwrap()
+    );
 }
 
-pub fn part_two(args: Args) {}
+pub fn part_two(args: Args) {
+    let mut day_five = FILE_CONTENTS.parse::<DayFive>().unwrap().with_seed_ranges();
+    println!(
+        "Lowest Location: {}",
+        day_five
+            .lowest_location()
+            .ok_or_else(|| anyhow!("no location data found"))
+            .unwrap()
+    );
+}
