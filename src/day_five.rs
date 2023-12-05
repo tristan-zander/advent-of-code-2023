@@ -11,7 +11,6 @@ const FILE_CONTENTS: &'static str = include_str!("../inputs/day_five.txt");
 struct SourceDestination {
     pub source_range: Range<u64>,
     pub destination_range: Range<u64>,
-    pub length: u64,
 }
 
 impl SourceDestination {
@@ -19,7 +18,6 @@ impl SourceDestination {
         Self {
             source_range: source_start..source_start + length,
             destination_range: dest_start..dest_start + length,
-            length,
         }
     }
 
@@ -125,33 +123,30 @@ impl DayFive {
     }
 
     pub fn seed_data(&self, seed: u64) -> SeedData {
-            let soil = self.seed_to_soil.get_destination_value(seed);
-            let fertilizer = self.soil_to_fertilizer.get_destination_value(soil);
-            let water = self.fertilizer_to_water.get_destination_value(fertilizer);
-            let light = self.water_to_light.get_destination_value(water);
-            let temperature = self.light_to_temperature.get_destination_value(light);
-            let humidity = self
-                .temperature_to_humidity
-                .get_destination_value(temperature);
-            let location = self.humidity_to_location.get_destination_value(humidity);
-                SeedData {
-                    soil,
-                    fertilizer,
-                    water,
-                    light,
-                    temperature,
-                    humidity,
-                    location,
-                }
+        let soil = self.seed_to_soil.get_destination_value(seed);
+        let fertilizer = self.soil_to_fertilizer.get_destination_value(soil);
+        let water = self.fertilizer_to_water.get_destination_value(fertilizer);
+        let light = self.water_to_light.get_destination_value(water);
+        let temperature = self.light_to_temperature.get_destination_value(light);
+        let humidity = self
+            .temperature_to_humidity
+            .get_destination_value(temperature);
+        let location = self.humidity_to_location.get_destination_value(humidity);
+        SeedData {
+            soil,
+            fertilizer,
+            water,
+            light,
+            temperature,
+            humidity,
+            location,
+        }
     }
 
     pub fn calculate_table(&mut self) {
         for seed in &self.seeds {
             let seed_data = self.seed_data(*seed);
-            self.table.insert(
-                *seed,
-                seed_data
-            );
+            self.table.insert(*seed, seed_data);
         }
     }
 
@@ -252,7 +247,7 @@ impl FromStr for DayFive {
     }
 }
 
-pub fn part_one(args: Args) {
+pub fn part_one(_args: Args) {
     let day_five: DayFive = FILE_CONTENTS.parse().unwrap();
     println!("{}", day_five);
     println!(
@@ -264,8 +259,8 @@ pub fn part_one(args: Args) {
     );
 }
 
-pub fn part_two(args: Args) {
-    let mut day_five = FILE_CONTENTS.parse::<DayFive>().unwrap().with_seed_ranges();
+pub fn part_two(_args: Args) {
+    let day_five = FILE_CONTENTS.parse::<DayFive>().unwrap().with_seed_ranges();
     println!(
         "Lowest Location: {}",
         day_five
