@@ -1,10 +1,14 @@
 use clap::Parser;
 use macros::solutions;
 
+#[macro_use]
+extern crate anyhow;
+
 mod day_four;
 mod day_one;
 mod day_three;
 mod day_two;
+mod day_five;
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
@@ -22,6 +26,7 @@ const SOLUTIONS: phf::Map<&'static str, Solution> = solutions![
     mod day_two;
     mod day_three;
     mod day_four;
+    mod day_five;
 ];
 
 fn main() {
