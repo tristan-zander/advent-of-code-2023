@@ -7,10 +7,10 @@ extern crate anyhow;
 mod day_five;
 mod day_four;
 mod day_one;
+mod day_seven;
 mod day_six;
 mod day_three;
 mod day_two;
-mod day_seven;
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
