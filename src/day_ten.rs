@@ -1,4 +1,10 @@
-use std::{borrow::BorrowMut, cell::RefCell, cmp::min, fmt::Display, rc::Rc, str::FromStr};
+use std::{
+    cell::RefCell,
+    collections::{btree_map::Entry, BTreeMap},
+    fmt::Display,
+    rc::Rc,
+    str::FromStr,
+};
 
 use itertools::Itertools;
 use prettytable::{Cell, Row, Table};
@@ -155,6 +161,37 @@ impl Pipe {
             PipeType::Ground => vec![],
         }
     }
+
+    pub fn can_accept(&self, other_x: u64, other_y: u64) -> bool {
+        let (x, y) = (self.coords.0 as i64, self.coords.1 as i64);
+        let (difference_x, difference_y) = (other_x as i64 - x, other_y as i64 - y);
+        match self.pipe_type {
+            PipeType::Start | PipeType::Ground => false,
+            PipeType::Vertical => difference_x == 0 && difference_y.abs_diff(0) == 1,
+            PipeType::Horizontal => difference_y == 0 && difference_x.abs_diff(0) == 1,
+            PipeType::NorthAndEast | PipeType::NorthAndWest
+                if (difference_x, difference_y) == (0, -1) =>
+            {
+                true
+            }
+            PipeType::NorthAndEast | PipeType::SouthAndEast
+                if (difference_x, difference_y) == (1, 0) =>
+            {
+                true
+            }
+            PipeType::SouthAndEast | PipeType::SouthAndWest
+                if (difference_x, difference_y) == (0, 1) =>
+            {
+                true
+            }
+            PipeType::SouthAndWest | PipeType::NorthAndWest
+                if (difference_x, difference_y) == (-1, 0) =>
+            {
+                true
+            }
+            _ => false,
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -181,44 +218,50 @@ impl Display for DayTen {
 
 impl DayTen {
     pub fn longest_distance(&mut self) -> u64 {
-        let mut pipes_to_check = vec![self.starting_pipe.clone()];
-        let mut neighbors = Vec::new();
-        let mut distance = 0_u64;
+        let mut stack = vec![self.starting_pipe.clone()];
+        let mut distances: BTreeMap<(u64, u64), Rc<RefCell<Pipe>>> = BTreeMap::new();
 
         let (height, width) = (self.pipes.len(), self.pipes[0].len());
 
-        while pipes_to_check.len() > 0 {
-            neighbors.clear();
-            for p in &pipes_to_check {
-                let mut pipe = p.as_ref().borrow_mut();
+        while let Some(p) = stack.pop() {
+            let pipe = p.as_ref().borrow_mut();
+            let (x, y) = pipe.coords;
+            let new_distance = pipe.distance + 1;
+            let neighbors = pipe.get_neighbors(height as u64, width as u64);
 
-                if pipe.distance != 0 {
-                    continue;
+            let neighbors = neighbors
+                .iter()
+                .map(|(x, y)| self.pipes[*y as usize][*x as usize].to_owned())
+                .filter(|p| match p.borrow().pipe_type {
+                    PipeType::Ground | PipeType::Start => false,
+                    _ => true,
+                })
+                .filter(|p| p.as_ref().borrow().can_accept(x, y));
+
+            for n in neighbors {
+                let mut neighbor = n.as_ref().borrow_mut();
+                match distances.entry(neighbor.coords) {
+                    Entry::Vacant(entry) => {
+                        neighbor.distance = new_distance;
+                        entry.insert(n.clone());
+                        stack.push(n.clone());
+                    }
+                    Entry::Occupied(mut entry) => {
+                        if neighbor.distance > new_distance {
+                            neighbor.distance = new_distance;
+                            entry.insert(n.clone());
+                            stack.push(n.clone());
+                        }
+                    }
                 }
-
-                pipe.distance = distance;
-
-                let n = pipe.get_neighbors(height as _, width as _);
-
-                neighbors.extend(
-                    n.iter()
-                        .map(|(x, y)| self.pipes[*y as usize][*x as usize].to_owned())
-                        .filter(|p| match p.borrow().pipe_type {
-                            PipeType::Ground | PipeType::Start => false,
-                            _ => true,
-                        }),
-                );
-            }
-
-            pipes_to_check.clear();
-            pipes_to_check.extend_from_slice(&neighbors);
-
-            if neighbors.len() > 0 {
-                distance += 1;
             }
         }
 
-        distance - 1
+        distances
+            .values()
+            .map(|p| p.borrow().distance)
+            .max()
+            .unwrap()
     }
 }
 
