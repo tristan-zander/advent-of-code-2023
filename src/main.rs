@@ -13,6 +13,7 @@ mod day_seven;
 mod day_six;
 mod day_three;
 mod day_two;
+mod day_ten;
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
@@ -35,6 +36,7 @@ const SOLUTIONS: phf::Map<&'static str, Solution> = solutions![
     mod day_seven;
     mod day_eight;
     mod day_nine;
+    mod day_ten;
 ];
 
 fn main() {
