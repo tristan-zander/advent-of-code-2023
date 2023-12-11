@@ -1,6 +1,6 @@
 use std::{
     cell::RefCell,
-    collections::{btree_map::Entry, BTreeMap},
+    collections::{btree_map::Entry, BTreeMap, BTreeSet},
     fmt::Display,
     rc::Rc,
     str::FromStr,
@@ -28,7 +28,7 @@ enum PipeType {
 #[derive(Debug, Clone)]
 struct Pipe {
     pub distance: u64,
-    pub coords: (u64, u64),
+    pub coords: (i64, i64),
     pub pipe_type: PipeType,
 }
 
@@ -47,7 +47,7 @@ impl Display for Pipe {
 }
 
 impl Pipe {
-    pub fn new(x: u64, y: u64, pipe_type: PipeType) -> Self {
+    pub fn new(x: i64, y: i64, pipe_type: PipeType) -> Self {
         Self {
             distance: 0,
             coords: (x, y),
@@ -55,27 +55,27 @@ impl Pipe {
         }
     }
 
-    pub fn get_neighbors(&self, bounding_height: u64, bounding_width: u64) -> Vec<(u64, u64)> {
+    pub fn get_neighbors(&self, bounding_height: i64, bounding_width: i64) -> Vec<(i64, i64)> {
         let (x, y) = self.coords;
 
         match self.pipe_type {
             PipeType::Start => {
                 let mut ret = Vec::with_capacity(4);
 
-                if x != 0 {
-                    ret.push((x - 1, y));
+                if y != 0 {
+                    ret.push((x, y - 1));
                 }
 
                 if x < bounding_width {
                     ret.push((x + 1, y));
                 }
 
-                if y != 0 {
-                    ret.push((x, y - 1));
-                }
-
                 if y < bounding_height {
                     ret.push((x, y + 1));
+                }
+
+                if x != 0 {
+                    ret.push((x - 1, y));
                 }
 
                 ret
@@ -96,12 +96,12 @@ impl Pipe {
             PipeType::Horizontal => {
                 let mut ret = Vec::with_capacity(2);
 
-                if x != 0 {
-                    ret.push((x - 1, y));
-                }
-
                 if x < bounding_width {
                     ret.push((x + 1, y));
+                }
+
+                if x != 0 {
+                    ret.push((x - 1, y));
                 }
 
                 ret
@@ -109,12 +109,12 @@ impl Pipe {
             PipeType::NorthAndEast => {
                 let mut ret = Vec::with_capacity(2);
 
-                if x < bounding_width {
-                    ret.push((x + 1, y));
-                }
-
                 if y != 0 {
                     ret.push((x, y - 1));
+                }
+
+                if x < bounding_width {
+                    ret.push((x + 1, y));
                 }
 
                 ret
@@ -122,12 +122,12 @@ impl Pipe {
             PipeType::NorthAndWest => {
                 let mut ret = Vec::with_capacity(2);
 
-                if x != 0 {
-                    ret.push((x - 1, y));
-                }
-
                 if y != 0 {
                     ret.push((x, y - 1));
+                }
+
+                if x != 0 {
+                    ret.push((x - 1, y));
                 }
 
                 ret
@@ -135,12 +135,12 @@ impl Pipe {
             PipeType::SouthAndWest => {
                 let mut ret = Vec::with_capacity(2);
 
-                if x != 0 {
-                    ret.push((x - 1, y));
-                }
-
                 if y < bounding_height {
                     ret.push((x, y + 1));
+                }
+
+                if x != 0 {
+                    ret.push((x - 1, y));
                 }
 
                 ret
@@ -162,7 +162,7 @@ impl Pipe {
         }
     }
 
-    pub fn can_accept(&self, other_x: u64, other_y: u64) -> bool {
+    pub fn can_accept(&self, other_x: i64, other_y: i64) -> bool {
         let (x, y) = (self.coords.0 as i64, self.coords.1 as i64);
         let (difference_x, difference_y) = (other_x as i64 - x, other_y as i64 - y);
         match self.pipe_type {
@@ -219,7 +219,7 @@ impl Display for DayTen {
 impl DayTen {
     pub fn longest_distance(&mut self) -> u64 {
         let mut stack = vec![self.starting_pipe.clone()];
-        let mut distances: BTreeMap<(u64, u64), Rc<RefCell<Pipe>>> = BTreeMap::new();
+        let mut distances: BTreeMap<(i64, i64), Rc<RefCell<Pipe>>> = BTreeMap::new();
 
         let (height, width) = (self.pipes.len(), self.pipes[0].len());
 
@@ -227,7 +227,7 @@ impl DayTen {
             let pipe = p.as_ref().borrow_mut();
             let (x, y) = pipe.coords;
             let new_distance = pipe.distance + 1;
-            let neighbors = pipe.get_neighbors(height as u64, width as u64);
+            let neighbors = pipe.get_neighbors(height as i64, width as i64);
 
             let neighbors = neighbors
                 .iter()
@@ -263,6 +263,57 @@ impl DayTen {
             .max()
             .unwrap()
     }
+
+    pub fn enclosed_tiles(&mut self) -> i64 {
+        let mut stack = vec![self.starting_pipe.clone()];
+        let mut visited: BTreeSet<(i64, i64)> = BTreeSet::new();
+        visited.insert(self.starting_pipe.borrow().coords);
+        let mut pipe_loop = vec![self.starting_pipe.as_ref().borrow().coords];
+
+        let (height, width) = (self.pipes.len(), self.pipes[0].len());
+
+        while let Some(p) = stack.pop() {
+            let pipe = p.as_ref().borrow_mut();
+            let (x, y) = pipe.coords;
+            let neighbors = pipe.get_neighbors(height as i64, width as i64);
+
+            let mut neighbors = neighbors
+                .iter()
+                .map(|(x, y)| self.pipes[*y as usize][*x as usize].to_owned())
+                .filter(|p| match p.borrow().pipe_type {
+                    PipeType::Ground | PipeType::Start => false,
+                    _ if p.borrow().can_accept(x, y) && !visited.contains(&p.borrow().coords) => {
+                        true
+                    }
+                    _ => false,
+                });
+
+            if let Some(n) = neighbors.next() {
+                let neighbor = n.as_ref().borrow_mut();
+                if visited.insert(neighbor.coords) {
+                    stack.push(n.clone());
+                    pipe_loop.push(neighbor.coords);
+                }
+            }
+        }
+
+        // Shoelace Formula (Pick's Theorem)
+        // https://en.wikipedia.org/wiki/Shoelace_formula
+        let pipe_len = pipe_loop.len() as i64;
+        pipe_loop.push(self.starting_pipe.as_ref().borrow().coords);
+
+        println!("{:?}", pipe_loop);
+
+        let twice_area = pipe_loop
+            .into_iter()
+            .tuple_windows::<((i64, i64), (i64, i64))>()
+            .map(|((x_1, y_1), (x_2, y_2))| (x_1 * y_2) - (x_2 * y_1))
+            .sum::<i64>();
+
+        let area = (twice_area / 2).abs();
+        println!("Pipe Length: {}, Area: {}", pipe_len, area);
+        return area - (pipe_len / 2) + 1;
+    }
 }
 
 impl FromStr for DayTen {
@@ -277,8 +328,8 @@ impl FromStr for DayTen {
                     .enumerate()
                     .map(move |(x, c)| {
                         Rc::new(RefCell::new(Pipe::new(
-                            x as u64,
-                            y as u64,
+                            x as i64,
+                            y as i64,
                             match c {
                                 'S' => PipeType::Start,
                                 '|' => PipeType::Vertical,
@@ -328,4 +379,10 @@ pub fn part_one(_args: Args) {
     println!("Input:\n{}", input);
     println!("Longest: {}", longest);
 }
-pub fn part_two(_args: Args) {}
+
+pub fn part_two(_args: Args) {
+    let mut input = FILE_CONTENTS.parse::<DayTen>().unwrap();
+    let enclosed = input.enclosed_tiles();
+    println!("Input:\n{}", input);
+    println!("Enclosed: {}", enclosed);
+}
