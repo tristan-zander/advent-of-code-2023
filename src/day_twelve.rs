@@ -1,0 +1,97 @@
+use std::collections::HashSet;
+
+use itertools::{iproduct, Itertools, Product};
+
+use crate::Args;
+
+const FILE_CONTENTS: &'static str = include_str!("../inputs/day_twelve.txt");
+
+fn read_input() -> Vec<(Vec<u8>, Vec<u8>)> {
+    FILE_CONTENTS
+        .lines()
+        .map(|l| {
+            let (left, right) = l.split(' ').collect_tuple().unwrap();
+            (
+                left.bytes().collect_vec(),
+                right
+                    .split(',')
+                    .map(|c| c.parse::<u8>().unwrap())
+                    .collect_vec(),
+            )
+        })
+        .collect_vec()
+}
+
+fn find_holes(bytes: Vec<u8>) -> Vec<usize> {
+    bytes
+        .iter()
+        .enumerate()
+        .filter_map(|(i, byte)| {
+            if byte == &b'?' {
+                return Some(i);
+            } else {
+                return None;
+            }
+        })
+        .collect_vec()
+}
+
+fn hole_groups(holes: Vec<usize>) -> Vec<(usize, usize)> {
+    let mut res = Vec::new();
+    let mut iter = holes.iter();
+    let mut prev = *iter.next().unwrap();
+    let mut buf = vec![prev];
+
+    while let Some(&hole_idx) = iter.next() {
+        if hole_idx - prev != 1 {
+            let start_idx = buf[0];
+            let len = buf.len();
+            res.push((start_idx, len));
+            buf.clear();
+        }
+
+        buf.push(hole_idx);
+        prev = hole_idx;
+    }
+
+    if buf.len() != 0 {
+        let start_idx = buf[0];
+        let len = buf.len();
+        res.push((start_idx, len));
+        buf.clear();
+    }
+
+    res
+}
+
+pub fn part_one(_args: Args) {
+    let input = read_input();
+    for (bytes, sequence) in input {
+        let len = bytes.len();
+        let holes = find_holes(bytes);
+        let groups = hole_groups(holes);
+        println!("Groups: {:?}", groups);
+        let combos = groups
+            .iter()
+            .map(|(_, len)| {
+                [b'.', b'#']
+                    .repeat(*len)
+                    .into_iter()
+                    .combinations(*len)
+                    .map(|c| String::from_utf8(c).unwrap())
+                    .collect::<HashSet<_>>()
+            })
+            .collect_vec();
+
+        // let mut buf = Vec::new();
+        combos.iter().fold(Vec::new(), |acc, x| {
+            let product = iproduct!(acc, x).collect_vec();
+
+            unimplemented!()
+        });
+
+        println!("Combos: {:?}", combos);
+    }
+}
+
+pub fn part_two(_args: Args) {}
