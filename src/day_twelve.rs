@@ -22,7 +22,7 @@ fn read_input() -> Vec<(Vec<u8>, Vec<u8>)> {
         .collect_vec()
 }
 
-fn find_holes(bytes: Vec<u8>) -> Vec<usize> {
+fn find_holes(bytes: &Vec<u8>) -> Vec<usize> {
     bytes
         .iter()
         .enumerate()
@@ -67,10 +67,8 @@ fn hole_groups(holes: Vec<usize>) -> Vec<(usize, usize)> {
 pub fn part_one(_args: Args) {
     let input = read_input();
     for (bytes, sequence) in input {
-        let len = bytes.len();
-        let holes = find_holes(bytes);
+        let holes = find_holes(&bytes);
         let groups = hole_groups(holes);
-        println!("Groups: {:?}", groups);
         let combos = groups
             .iter()
             .map(|(_, len)| {
@@ -84,13 +82,41 @@ pub fn part_one(_args: Args) {
             .collect_vec();
 
         // let mut buf = Vec::new();
-        combos.iter().fold(Vec::new(), |acc, x| {
-            let product = iproduct!(acc, x).collect_vec();
+        let all_possible_combos = combos.iter().skip(1).fold(
+            combos
+                .first()
+                .unwrap()
+                .iter()
+                .cloned()
+                .map(|i| vec![i])
+                .collect_vec(),
+            |acc, x| {
+                iproduct!(acc, x)
+                    .map(|(map, next_value)| {
+                        let mut replacement = map.clone();
+                        replacement.push(next_value.to_owned());
+                        replacement
+                    })
+                    .collect_vec()
+            },
+        );
 
-            unimplemented!()
-        });
+        let input = String::from_utf8(bytes).unwrap();
 
-        println!("Combos: {:?}", combos);
+        for possible_combo in all_possible_combos {
+            let mut buf = Vec::new();
+            let mut next_in_combo = possible_combo.iter();
+            let mut not_holes = input.split("?").filter(|s| s != &"");
+            for (c, _grp) in input.bytes().group_by(|i| *i).into_iter() {
+                match c {
+                    b'.' | b'#' => buf.extend(not_holes.next().unwrap().bytes()),
+                    b'?' => buf.extend(next_in_combo.next().unwrap().bytes()),
+                    _ => unreachable!(),
+                }
+            }
+
+            // check buf for the answer here
+        }
     }
 }
 
