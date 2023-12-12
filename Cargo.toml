@@ -21,5 +21,6 @@ phf = { version = "0.11.2", features = ["macros"] }
 prettytable-rs = "0.10.0"
 proc-macro2 = "1.0.70"
 quote = "1.0.33"
+rayon = "1.8.0"
 slab_tree = "0.3.2"
 syn = "2.0.39"

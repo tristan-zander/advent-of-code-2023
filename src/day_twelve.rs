@@ -1,6 +1,7 @@
 use std::collections::HashSet;
 
 use itertools::{iproduct, Itertools};
+use rayon::prelude::*;
 
 use crate::Args;
 
@@ -22,27 +23,22 @@ fn read_input() -> Vec<(Vec<u8>, Vec<u8>)> {
         .collect_vec()
 }
 
-fn find_holes(bytes: &Vec<u8>) -> Vec<usize> {
-    bytes
-        .iter()
-        .enumerate()
-        .filter_map(|(i, byte)| {
-            if byte == &b'?' {
-                return Some(i);
-            } else {
-                return None;
-            }
-        })
-        .collect_vec()
+fn find_holes(bytes: &[u8]) -> impl Iterator<Item = usize> + '_ {
+    bytes.iter().enumerate().filter_map(|(i, byte)| {
+        if byte == &b'?' {
+            return Some(i);
+        } else {
+            return None;
+        }
+    })
 }
 
-fn hole_groups(holes: Vec<usize>) -> Vec<(usize, usize)> {
+fn hole_groups<T: Iterator<Item = usize>>(mut holes: T) -> Vec<(usize, usize)> {
     let mut res = Vec::new();
-    let mut iter = holes.iter();
-    let mut prev = *iter.next().unwrap();
+    let mut prev = holes.next().unwrap();
     let mut buf = vec![prev];
 
-    while let Some(&hole_idx) = iter.next() {
+    while let Some(hole_idx) = holes.next() {
         if hole_idx - prev != 1 {
             let start_idx = buf[0];
             let len = buf.len();
@@ -85,73 +81,59 @@ fn is_combination(buf: &Vec<u8>, seq: &Vec<u8>) -> bool {
         .all(|(left, right)| left == *right)
 }
 
-pub fn part_one(_args: Args) {
-    let input = read_input();
-    let mut sum = 0;
-    for (bytes, sequence) in input {
-        let holes = find_holes(&bytes);
-        let groups = hole_groups(holes);
-        let combos = groups
-            .iter()
-            .map(|(_, len)| {
-                [b'.', b'#']
-                    .repeat(*len)
-                    .into_iter()
-                    .combinations(*len)
-                    .map(|c| String::from_utf8(c).unwrap())
-                    .collect::<HashSet<_>>()
-            })
-            .collect_vec();
-
-        // let mut buf = Vec::new();
-        let all_possible_combos = combos.iter().skip(1).fold(
-            combos
-                .first()
-                .unwrap()
-                .iter()
-                .cloned()
-                .map(|i| vec![i])
-                .collect_vec(),
-            |acc, x| {
-                iproduct!(acc, x)
-                    .map(|(map, next_value)| {
-                        let mut replacement = map.clone();
-                        replacement.push(next_value.to_owned());
-                        replacement
-                    })
-                    .collect_vec()
-            },
-        );
-
-        let input = String::from_utf8(bytes).unwrap();
-
-        for possible_combo in all_possible_combos {
-            let mut buf = Vec::new();
-            let mut next_in_combo = possible_combo.iter();
-            let mut not_holes = input.split("?").filter(|s| s != &"");
-            for (c, _grp) in input
-                .bytes()
-                .group_by(|i| {
-                    if *i == b'?' {
-                        return b'?';
+fn build_zones(bytes: &[u8]) -> Vec<(usize, usize)> {
+    let len = bytes.len();
+    let mut res = Vec::new();
+    let mut iter = bytes.iter().enumerate();
+    while let Some((i, &byte)) = iter.next() {
+        match byte {
+            b'.' => {}
+            b'#' | b'?' => {
+                // loop until next '.' or end of bytes
+                let start = i;
+                let mut end = len;
+                while let Some((j, &byte)) = iter.next() {
+                    if byte == b'.' {
+                        end = j - 1;
+                        break;
                     }
-                    return b'.';
-                })
-                .into_iter()
-            {
-                match c {
-                    b'.' | b'#' => buf.extend(not_holes.next().unwrap().bytes()),
-                    b'?' => buf.extend(next_in_combo.next().unwrap().bytes()),
-                    _ => unreachable!(),
                 }
+                res.push((start, end));
             }
-
-            if is_combination(&buf, &sequence) {
-                sum += 1;
-            }
+            _ => unreachable!(),
         }
     }
+
+    res
+}
+
+fn solve(bytes: Vec<u8>, sequence: Vec<u8>) -> usize {
+    let holes = find_holes(&bytes).collect_vec();
+    let zones = build_zones(&bytes);
+
+    println!("{:?}\n{:?}", holes, zones);
+
+    unimplemented!()
+}
+
+pub fn part_one(_args: Args) {
+    let input = read_input();
+    let sum = input
+        .into_par_iter()
+        .map(|(bytes, sequence)| solve(bytes, sequence))
+        .sum::<usize>();
     println!("Sum: {}", sum);
 }
 
-pub fn part_two(_args: Args) {}
+pub fn part_two(_args: Args) {
+    let input = read_input()
+        .into_iter()
+        .map(|(bytes, seq)| (bytes.repeat(5), seq.repeat(5)))
+        .collect_vec();
+    let sum = input
+        .into_iter()
+        .enumerate()
+        .map(|(i, (bytes, sequence))| solve(bytes, sequence))
+        .sum::<usize>();
+    println!("Sum: {}", sum);
+}
