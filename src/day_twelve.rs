@@ -1,6 +1,6 @@
 use std::collections::HashSet;
 
-use itertools::{iproduct, Itertools, Product};
+use itertools::{iproduct, Itertools};
 
 use crate::Args;
 
@@ -64,8 +64,30 @@ fn hole_groups(holes: Vec<usize>) -> Vec<(usize, usize)> {
     res
 }
 
+fn is_combination(buf: &Vec<u8>, seq: &Vec<u8>) -> bool {
+    let groups = buf
+        .split(|c| c == &b'.')
+        .filter_map(|grp| {
+            if grp.len() == 0 {
+                return None;
+            }
+            return Some(grp.len() as u8);
+        })
+        .collect_vec();
+
+    if groups.len() != seq.len() {
+        return false;
+    }
+
+    groups
+        .into_iter()
+        .zip(seq.iter())
+        .all(|(left, right)| left == *right)
+}
+
 pub fn part_one(_args: Args) {
     let input = read_input();
+    let mut sum = 0;
     for (bytes, sequence) in input {
         let holes = find_holes(&bytes);
         let groups = hole_groups(holes);
@@ -107,7 +129,16 @@ pub fn part_one(_args: Args) {
             let mut buf = Vec::new();
             let mut next_in_combo = possible_combo.iter();
             let mut not_holes = input.split("?").filter(|s| s != &"");
-            for (c, _grp) in input.bytes().group_by(|i| *i).into_iter() {
+            for (c, _grp) in input
+                .bytes()
+                .group_by(|i| {
+                    if *i == b'?' {
+                        return b'?';
+                    }
+                    return b'.';
+                })
+                .into_iter()
+            {
                 match c {
                     b'.' | b'#' => buf.extend(not_holes.next().unwrap().bytes()),
                     b'?' => buf.extend(next_in_combo.next().unwrap().bytes()),
@@ -115,9 +146,12 @@ pub fn part_one(_args: Args) {
                 }
             }
 
-            // check buf for the answer here
+            if is_combination(&buf, &sequence) {
+                sum += 1;
+            }
         }
     }
+    println!("Sum: {}", sum);
 }
 
 pub fn part_two(_args: Args) {}
