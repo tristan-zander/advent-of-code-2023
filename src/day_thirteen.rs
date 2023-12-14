@@ -103,9 +103,16 @@ fn solve(rows: &[String], cols: &[String]) -> usize {
 /// ARGS:
 /// ret.0 == true IF it was a column, otherwise it's a row
 /// ret.1 is the index in the row/column that was matched.
-fn solve_part_two(rows: &[String], cols: &[String]) -> Option<(bool, usize)> {
+fn solve_part_two(
+    rows: &[String],
+    cols: &[String],
+    starting: Option<(bool, usize)>,
+) -> Option<(bool, usize)> {
     if let Some(num) = row_symmetry(rows) {
-        return Some((false, num / 100));
+        let res = (false, num / 100);
+        if starting.map(|starting| res != starting).unwrap_or(true) {
+            return Some(res);
+        }
     }
 
     if let Some(num) = col_symmetry(cols) {
@@ -131,8 +138,7 @@ pub fn part_two(_args: Args) {
         .map(|(mut rows, mut cols)| {
             let len = rows[0].len();
 
-            let solved = solve(&rows, &cols);
-            let (original_is_column, original_index) = solve_part_two(&rows, &cols).unwrap();
+            let (original_is_column, original_index) = solve_part_two(&rows, &cols, None).unwrap();
 
             for row in 0..rows.len() {
                 for col in 0..len {
@@ -143,7 +149,9 @@ pub fn part_two(_args: Args) {
                         rows[row].as_mut_vec()[col] = b'#';
                         cols[col].as_mut_vec()[row] = b'#';
 
-                        if let Some((new_is_column, index)) = solve_part_two(&rows, &cols) {
+                        if let Some((new_is_column, index)) =
+                            solve_part_two(&rows, &cols, Some((original_is_column, original_index)))
+                        {
                             if original_is_column && !new_is_column || (index != original_index) {
                                 return solve(&rows, &cols);
                             }
@@ -152,7 +160,9 @@ pub fn part_two(_args: Args) {
                         rows[row].as_mut_vec()[col] = b'.';
                         cols[col].as_mut_vec()[row] = b'.';
 
-                        if let Some((new_is_column, index)) = solve_part_two(&rows, &cols) {
+                        if let Some((new_is_column, index)) =
+                            solve_part_two(&rows, &cols, Some((original_is_column, original_index)))
+                        {
                             if original_is_column && !new_is_column || (index != original_index) {
                                 return solve(&rows, &cols);
                             }
