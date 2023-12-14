@@ -103,16 +103,10 @@ fn solve(rows: &[String], cols: &[String]) -> usize {
 /// ARGS:
 /// ret.0 == true IF it was a column, otherwise it's a row
 /// ret.1 is the index in the row/column that was matched.
-fn solve_part_two(
-    rows: &[String],
-    cols: &[String],
-    starting: Option<(bool, usize)>,
-) -> Option<(bool, usize)> {
-    if let Some(num) = row_symmetry(rows) {
-        let res = (false, num / 100);
-        if starting.map(|starting| res != starting).unwrap_or(true) {
-            return Some(res);
-        }
+fn solve_part_two(rows: &[String], cols: &[String]) -> Option<(bool, usize)> {
+    if let Some(num) = symmetry(rows) {
+        let res = (false, num);
+        return Some(res);
     }
 
     if let Some(num) = col_symmetry(cols) {
@@ -126,7 +120,13 @@ pub fn part_one(_args: Args) {
     let input = input(FILE_CONTENTS);
     let res = input
         .into_iter()
-        .map(|(rows, cols)| solve(&rows, &cols))
+        .map(|(rows, cols)| {
+            let res = solve(&rows, &cols);
+            if res == 0 {
+                panic!("Part 1 should never be 0");
+            }
+            res
+        })
         .sum::<usize>();
     println!("Sum: {}", res);
 }
@@ -138,31 +138,19 @@ pub fn part_two(_args: Args) {
         .map(|(mut rows, mut cols)| {
             let len = rows[0].len();
 
-            let (original_is_column, original_index) = solve_part_two(&rows, &cols, None).unwrap();
+            let (original_is_column, original_index) = solve_part_two(&rows, &cols).unwrap();
 
             for row in 0..rows.len() {
                 for col in 0..len {
                     // SAFETY: I hope this is valid UTF-8
                     unsafe {
-                        let old_char = rows[row].bytes().nth(col).unwrap();
+                        let old_char: u8 = rows[row].bytes().nth(col).unwrap();
+                        let new_char = if old_char == b'#' { b'.' } else { b'#' };
 
-                        rows[row].as_mut_vec()[col] = b'#';
-                        cols[col].as_mut_vec()[row] = b'#';
+                        rows[row].as_mut_vec()[col] = new_char;
+                        cols[col].as_mut_vec()[row] = new_char;
 
-                        if let Some((new_is_column, index)) =
-                            solve_part_two(&rows, &cols, Some((original_is_column, original_index)))
-                        {
-                            if original_is_column && !new_is_column || (index != original_index) {
-                                return solve(&rows, &cols);
-                            }
-                        }
-
-                        rows[row].as_mut_vec()[col] = b'.';
-                        cols[col].as_mut_vec()[row] = b'.';
-
-                        if let Some((new_is_column, index)) =
-                            solve_part_two(&rows, &cols, Some((original_is_column, original_index)))
-                        {
+                        if let Some((new_is_column, index)) = solve_part_two(&rows, &cols) {
                             if original_is_column && !new_is_column || (index != original_index) {
                                 return solve(&rows, &cols);
                             }
