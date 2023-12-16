@@ -82,18 +82,6 @@ fn symmetry(iter: &[String]) -> Option<usize> {
     None
 }
 
-fn symmetry_p2(iter: &[String], original: usize) -> Option<usize> {
-    let matches = get_matches(iter);
-
-    for possible_symmetry in matches {
-        if is_reflection(iter, possible_symmetry) && (possible_symmetry + 1) * 100 != original {
-            return Some(possible_symmetry + 1);
-        }
-    }
-
-    None
-}
-
 fn row_symmetry_p2(rows: &[String], original: usize) -> Option<usize> {
     let matches = get_matches(rows);
 

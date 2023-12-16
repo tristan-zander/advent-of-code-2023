@@ -13,10 +13,10 @@ mod day_one;
 mod day_seven;
 mod day_six;
 mod day_ten;
+mod day_thirteen;
 mod day_three;
 mod day_twelve;
 mod day_two;
-mod day_thirteen;
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
