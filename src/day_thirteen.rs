@@ -7,25 +7,27 @@ const FILE_CONTENTS: &'static str = include_str!("../inputs/day_thirteen.txt");
 fn input(input: &str) -> Vec<(Vec<String>, Vec<String>)> {
     let patterns = input
         .split("\n\n")
-        .map(|pattern| {
-            let rows = pattern.lines().map(|s| s.to_owned()).collect_vec();
-            let rows_slice = rows.as_slice();
-            let cols = (0..rows[0].len())
-                .map(move |i| {
-                    String::from_utf8(
-                        rows_slice
-                            .iter()
-                            .map(move |r| r.bytes().nth(i).unwrap())
-                            .collect_vec(),
-                    )
-                    .unwrap()
-                })
-                .collect_vec();
-            (rows, cols)
-        })
+        .map(|pattern| breakout_pattern(pattern))
         .collect_vec();
 
     patterns
+}
+
+fn breakout_pattern(pattern: &str) -> (Vec<String>, Vec<String>) {
+    let rows = pattern.lines().map(|s| s.to_owned()).collect_vec();
+    let rows_slice = rows.as_slice();
+    let cols = (0..rows[0].len())
+        .map(move |i| {
+            String::from_utf8(
+                rows_slice
+                    .iter()
+                    .map(move |r| r.bytes().nth(i).unwrap())
+                    .collect_vec(),
+            )
+            .unwrap()
+        })
+        .collect_vec();
+    (rows, cols)
 }
 
 fn get_matches(slice: &[String]) -> Vec<usize> {
@@ -65,7 +67,7 @@ fn is_reflection(iter: &[String], left: usize) -> bool {
         }
     }
 
-    unreachable!()
+    return false;
 }
 
 fn symmetry(iter: &[String]) -> Option<usize> {
@@ -73,6 +75,18 @@ fn symmetry(iter: &[String]) -> Option<usize> {
 
     for possible_symmetry in matches {
         if is_reflection(iter, possible_symmetry) {
+            return Some(possible_symmetry + 1);
+        }
+    }
+
+    None
+}
+
+fn symmetry_p2(iter: &[String], original: usize) -> Option<usize> {
+    let matches = get_matches(iter);
+
+    for possible_symmetry in matches {
+        if is_reflection(iter, possible_symmetry) && possible_symmetry + 1 != original {
             return Some(possible_symmetry + 1);
         }
     }
@@ -88,29 +102,29 @@ fn col_symmetry(cols: &[String]) -> Option<usize> {
     symmetry(cols)
 }
 
-fn solve(rows: &[String], cols: &[String]) -> usize {
-    if let Some(num) = row_symmetry(rows) {
-        return num;
-    }
-
+fn solve(rows: &[String], cols: &[String]) -> Option<usize> {
     if let Some(num) = col_symmetry(cols) {
-        return num;
+        return Some(num);
     }
 
-    return 0;
+    if let Some(num) = row_symmetry(rows) {
+        return Some(num);
+    }
+
+    return None;
 }
 
-/// ARGS:
-/// ret.0 == true IF it was a column, otherwise it's a row
-/// ret.1 is the index in the row/column that was matched.
-fn solve_part_two(rows: &[String], cols: &[String]) -> Option<(bool, usize)> {
-    if let Some(num) = symmetry(rows) {
-        let res = (false, num);
-        return Some(res);
+fn solve_p2(rows: &[String], cols: &[String], mut original: usize) -> Option<usize> {
+    if let Some(num) = symmetry_p2(cols, original) {
+        return Some(num);
     }
 
-    if let Some(num) = col_symmetry(cols) {
-        return Some((true, num));
+    if original >= 100 {
+        original = original / 100;
+    }
+
+    if let Some(num) = symmetry_p2(rows, original).map(|r| r * 100) {
+        return Some(num);
     }
 
     return None;
@@ -121,7 +135,7 @@ pub fn part_one(_args: Args) {
     let res = input
         .into_iter()
         .map(|(rows, cols)| {
-            let res = solve(&rows, &cols);
+            let res = solve(&rows, &cols).unwrap();
             if res == 0 {
                 panic!("Part 1 should never be 0");
             }
@@ -135,35 +149,85 @@ pub fn part_two(_args: Args) {
     let input = input(FILE_CONTENTS);
     let res = input
         .into_iter()
-        .map(|(mut rows, mut cols)| {
-            let len = rows[0].len();
+        .map(|(rows, cols)| {
+            let normal_solution = solve(&rows, &cols).unwrap();
+            let rows_with_one_difference = duplicate_with_differences(&rows);
 
-            let (original_is_column, original_index) = solve_part_two(&rows, &cols).unwrap();
-
-            for row in 0..rows.len() {
-                for col in 0..len {
-                    // SAFETY: I hope this is valid UTF-8
-                    unsafe {
-                        let old_char: u8 = rows[row].bytes().nth(col).unwrap();
-                        let new_char = if old_char == b'#' { b'.' } else { b'#' };
-
-                        rows[row].as_mut_vec()[col] = new_char;
-                        cols[col].as_mut_vec()[row] = new_char;
-
-                        if let Some((new_is_column, index)) = solve_part_two(&rows, &cols) {
-                            if original_is_column && !new_is_column || (index != original_index) {
-                                return solve(&rows, &cols);
-                            }
-                        }
-
-                        rows[row].as_mut_vec()[col] = old_char;
-                        cols[col].as_mut_vec()[row] = old_char;
-                    }
+            for (diffed_row, diffed_col) in rows_with_one_difference {
+                let maybe_res = solve_p2(&diffed_row, &diffed_col, normal_solution);
+                if maybe_res.map(|res| res != normal_solution).unwrap_or(false) {
+                    return maybe_res.unwrap();
                 }
             }
 
-            unreachable!()
+            let cols_with_one_difference = duplicate_with_differences(&cols);
+
+            for (diffed_col, diffed_row) in cols_with_one_difference {
+                let maybe_res = solve_p2(&diffed_row, &diffed_col, normal_solution);
+                if maybe_res.map(|res| res != normal_solution).unwrap_or(false) {
+                    return maybe_res.unwrap();
+                }
+            }
+
+            unreachable!("Part 2 should never get here.");
         })
         .sum::<usize>();
     println!("Sum: {}", res);
+}
+
+fn duplicate_with_differences(iter: &[String]) -> Vec<(Vec<String>, Vec<String>)> {
+    let differences = iter
+        .iter()
+        .enumerate()
+        .filter_map(|(i, str_to_match)| {
+            let mut counter = Vec::new();
+            for (j, other) in iter.iter().map(|s| s.as_str()).enumerate() {
+                let differences = str_to_match
+                    .bytes()
+                    .zip(other.bytes())
+                    .enumerate()
+                    .filter(|(_, (left, right))| left != right)
+                    .collect_vec();
+
+                if differences.len() != 1 {
+                    continue;
+                }
+
+                counter.push((i, j, differences[0].0, differences[0].1));
+            }
+
+            if counter.len() == 0 {
+                return None;
+            }
+
+            Some(counter)
+        })
+        .flat_map(|f| f);
+
+    let mut res = Vec::new();
+    for (left_row, right_row, str_idx, (left_byte, right_byte)) in differences {
+        let left_str = iter[left_row].as_str();
+        let right_str = iter[right_row].as_str();
+
+        let mut left_swapped = iter.to_owned();
+        left_swapped[left_row] = swap(left_str, right_byte, str_idx);
+
+        let mut right_swapped = iter.to_owned();
+        right_swapped[right_row] = swap(right_str, left_byte, str_idx);
+
+        res.push(left_swapped);
+        res.push(right_swapped);
+    }
+
+    res.into_iter()
+        .map(|x| breakout_pattern(x.join("\n").as_str()))
+        .collect_vec()
+}
+
+fn swap(original: &str, byte: u8, index: usize) -> String {
+    let mut mutated = original.to_owned();
+    // SAFETY: I'll ensure it's always valid UTF-8
+    let buf = unsafe { mutated.as_bytes_mut() };
+    buf[index] = byte;
+    mutated
 }
