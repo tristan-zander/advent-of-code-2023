@@ -86,7 +86,37 @@ fn symmetry_p2(iter: &[String], original: usize) -> Option<usize> {
     let matches = get_matches(iter);
 
     for possible_symmetry in matches {
-        if is_reflection(iter, possible_symmetry) && possible_symmetry + 1 != original {
+        if is_reflection(iter, possible_symmetry) && (possible_symmetry + 1) * 100 != original {
+            return Some(possible_symmetry + 1);
+        }
+    }
+
+    None
+}
+
+fn row_symmetry_p2(rows: &[String], original: usize) -> Option<usize> {
+    let matches = get_matches(rows);
+
+    for possible_symmetry in matches {
+        if is_reflection(rows, possible_symmetry) {
+            if original >= 100 && (possible_symmetry + 1) * 100 == original {
+                continue;
+            }
+            return Some((possible_symmetry + 1) * 100);
+        }
+    }
+
+    None
+}
+
+fn col_symmetry_p2(cols: &[String], original: usize) -> Option<usize> {
+    let matches = get_matches(cols);
+
+    for possible_symmetry in matches {
+        if is_reflection(cols, possible_symmetry) {
+            if original < 100 && possible_symmetry + 1 == original {
+                continue;
+            }
             return Some(possible_symmetry + 1);
         }
     }
@@ -114,16 +144,12 @@ fn solve(rows: &[String], cols: &[String]) -> Option<usize> {
     return None;
 }
 
-fn solve_p2(rows: &[String], cols: &[String], mut original: usize) -> Option<usize> {
-    if let Some(num) = symmetry_p2(cols, original) {
+fn solve_p2(rows: &[String], cols: &[String], original: usize) -> Option<usize> {
+    if let Some(num) = col_symmetry_p2(cols, original) {
         return Some(num);
     }
 
-    if original >= 100 {
-        original = original / 100;
-    }
-
-    if let Some(num) = symmetry_p2(rows, original).map(|r| r * 100) {
+    if let Some(num) = row_symmetry_p2(rows, original) {
         return Some(num);
     }
 
