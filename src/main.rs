@@ -6,6 +6,7 @@ extern crate anyhow;
 
 mod day_eight;
 mod day_eleven;
+mod day_fifteen;
 mod day_five;
 mod day_four;
 mod day_fourteen;
@@ -45,6 +46,7 @@ const SOLUTIONS: phf::Map<&'static str, Solution> = solutions![
     mod day_twelve;
     mod day_thirteen;
     mod day_fourteen;
+    mod day_fifteen;
 ];
 
 fn main() {
