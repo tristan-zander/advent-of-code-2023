@@ -14,6 +14,7 @@ mod day_nine;
 mod day_one;
 mod day_seven;
 mod day_six;
+mod day_sixteen;
 mod day_ten;
 mod day_thirteen;
 mod day_three;
@@ -47,6 +48,7 @@ const SOLUTIONS: phf::Map<&'static str, Solution> = solutions![
     mod day_thirteen;
     mod day_fourteen;
     mod day_fifteen;
+    mod day_sixteen;
 ];
 
 fn main() {
