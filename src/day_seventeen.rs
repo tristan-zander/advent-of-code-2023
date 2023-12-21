@@ -5,6 +5,8 @@ use std::{
     rc::Rc,
 };
 
+use itertools::Itertools;
+
 use crate::Args;
 
 const FILE_CONTENTS: &'static str = include_str!("../inputs/day_seventeen.txt");
@@ -41,8 +43,9 @@ impl Ord for State {
 }
 
 fn distance(position: (usize, usize), end_position: (usize, usize)) -> u64 {
-    let distance = (position.0.abs_diff(end_position.0) + position.1.abs_diff(end_position.1)) as u64;
-    distance + (distance / 4) * 2 
+    let distance =
+        (position.0.abs_diff(end_position.0) + position.1.abs_diff(end_position.1)) as u64;
+    distance + (distance / 4)
 }
 
 fn neighbors(input: &[Vec<u32>], state: &State) -> Vec<State> {
@@ -73,17 +76,17 @@ fn neighbors(input: &[Vec<u32>], state: &State) -> Vec<State> {
     let state = state_ptr.borrow();
     let prev = state.previous.clone().unwrap();
     let prev = prev.borrow();
-    let difference = (
+    let (diff_x, diff_y) = (
         state.position.0 as isize - prev.position.0 as isize,
         state.position.1 as isize - prev.position.1 as isize,
     );
 
     let mut neighbors = vec![];
-    if state.forward_steps != 3 {
+    if state.forward_steps < 2 {
         // Move forward
         let forward = (
-            state.position.0 as isize + difference.0,
-            state.position.1 as isize + difference.1,
+            state.position.0 as isize + diff_x,
+            state.position.1 as isize + diff_y,
         );
         if forward.0 <= max_x as isize
             && forward.0 >= 0
@@ -100,7 +103,7 @@ fn neighbors(input: &[Vec<u32>], state: &State) -> Vec<State> {
         }
     }
 
-    if difference.0 > 0 {
+    if diff_x != 0 {
         // Move up and down.
         let up = (state.position.0, state.position.1 as isize - 1);
         if up.1 <= max_y as isize && up.1 >= 0 {
@@ -149,96 +152,86 @@ fn neighbors(input: &[Vec<u32>], state: &State) -> Vec<State> {
     neighbors
 }
 
-fn shortest_path(input: &[Vec<u32>]) -> Option<u64> {
-    let mut heap = BinaryHeap::<Reverse<State>>::new();
-    let ending_position = (input[0].len() - 1, input.len() - 1);
-    heap.push(Reverse(State {
+fn a_star(input: &[Vec<u32>], start: (usize, usize), end: (usize, usize)) -> Option<State> {
+    let mut open = BinaryHeap::<Reverse<State>>::new();
+    open.push(Reverse(State {
         cost: 0,
-        position: (0, 0),
+        position: start,
         forward_steps: 0,
         previous: None,
         priority: 0,
     }));
-    let mut visited = HashMap::<(usize, usize), State>::new();
-    let mut possible_solutions = Vec::new();
+    let mut closed = HashMap::<(usize, usize), State>::new();
 
-    while let Some(current) = heap.pop() {
+    let avg = {
+        let vec = input
+            .iter()
+            .flatten()
+            .collect_vec();
+        vec.iter().cloned().sum::<u32>() / vec.len() as u32
+    };
+
+    while let Some(current) = open.pop() {
         let current = current.0;
 
-        if current.position == ending_position {
-            possible_solutions.push(current);
-            continue;
-        }
-
-        println!("Position: ({}, {})", current.position.0, current.position.1);
         let mut neighbors = neighbors(input, &current);
         for neighbor in &mut neighbors {
+            neighbor.previous = Some(Rc::new(RefCell::new(current.clone())));
             neighbor.cost = current.cost + input[neighbor.position.1][neighbor.position.0] as u64;
-            neighbor.priority = neighbor.cost + (distance(neighbor.position, ending_position));
-            if let Some(s) = visited.get_mut(&current.position) {
+            neighbor.priority = neighbor.cost
+                + distance(neighbor.position, end)
+                + (neighbor.forward_steps as u64 * (avg - 1) as u64);
+
+            if neighbor.position == end {
+                return Some(neighbor.clone());
+            }
+
+            if let Some(s) = closed.get(&neighbor.position) {
                 // Already gone through this node
-                if s.cost <= current.cost {
+                if s.priority < neighbor.priority {
                     continue;
                 }
-                s.previous = Some(Rc::new(RefCell::new(neighbor.clone())));
             }
 
-            heap.push(Reverse(neighbor.clone()));
-        }
-        if let Some(s) = visited.get_mut(&current.position) {
-            if s.cost <= current.cost {
-                continue;
-            }
-            s.previous = Some(Rc::new(RefCell::new(current.clone())));
-            visited.insert(current.position, current);
-        } else {
-            visited.insert(current.position, current);
+            open.push(Reverse(neighbor.clone()));
         }
 
-        for y in 0..input.len() {
-            for x in 0..input[0].len() {
-                if let Some(v) = visited.get(&(x, y)) {
-                    print!("{:>5}", v.cost);
-                } else {
-                    print!("{}", "  .  ");
-                }
-            }
-            print!("\n");
-        }
+        closed.insert(current.position, current);
     }
-
-
-    for y in 0..input.len() {
-        for x in 0..input[0].len() {
-            if let Some(v) = visited.get(&(x, y)) {
-                print!("{:>5}", v.cost);
-            } else {
-                print!("{}", "  .  ");
-            }
-        }
-        print!("\n");
-    }
-
-    println!("Priority");
-    
-    for y in 0..input.len() {
-        for x in 0..input[0].len() {
-            if let Some(v) = visited.get(&(x, y)) {
-                print!("{:>5}", v.priority);
-            } else {
-                print!("{}", "  .  ");
-            }
-        }
-        print!("\n");
-    }
-    
-    println!("{:#?}", possible_solutions.iter().min().unwrap());
 
     None
 }
 
+fn shortest_path(input: &[Vec<u32>]) -> u64 {
+    let ending_position = (input[0].len() - 1, input.len() - 1);
+    let state = a_star(input, (0, 0), ending_position).unwrap();
+
+    let mut path = vec![state.position];
+    let mut current = state.previous.clone();
+
+    while let Some(prev) = current {
+        path.push(prev.borrow().position);
+        current = prev.borrow().previous.clone();
+    }
+
+    println!("{:#?}", path);
+
+    for y in 0..input.len() {
+        for x in 0..input[0].len() {
+            if path.iter().contains(&(x, y)) {
+                print!(" = ");
+            } else {
+                print!(" . ");
+            }
+        }
+        print!("\n");
+    }
+
+    state.cost
+}
+
 pub fn part_one(_args: Args) {
     let input = input();
-    shortest_path(&input);
+    println!("Cost: {}", shortest_path(&input));
 }
 pub fn part_two(_args: Args) {}
