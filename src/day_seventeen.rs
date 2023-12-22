@@ -26,8 +26,31 @@ struct State {
     cost: u64,
     /// How many steps have happened since the last turn?
     forward_steps: u8,
+    /// How many steps have occurred since the start?
+    steps: u64,
     position: (usize, usize),
     previous: Option<Rc<RefCell<State>>>,
+}
+
+impl State {
+    fn came_from_direction(&self) -> Direction {
+        if let Some(prev) = self.previous.as_ref() {
+            // The case where this is not the first node.
+            let prev = prev.borrow();
+            if prev.position.0 < self.position.0 {
+                return Direction::West;
+            } else if prev.position.0 > self.position.0 {
+                return Direction::East;
+            } else if prev.position.1 < self.position.1 {
+                return Direction::North;
+            } else {
+                return Direction::South;
+            }
+        } else {
+            // The case where this is the first node.
+            return Direction::West;
+        }
+    }
 }
 
 impl std::hash::Hash for State {
@@ -59,6 +82,7 @@ fn neighbors(input: &[Vec<u32>], state: &State) -> Vec<State> {
                 cost: u64::MAX,
                 forward_steps: 0,
                 previous: Some(state_ptr.clone()),
+                steps: 1,
             },
             State {
                 position: (0, 1),
@@ -66,6 +90,7 @@ fn neighbors(input: &[Vec<u32>], state: &State) -> Vec<State> {
                 cost: u64::MAX,
                 forward_steps: 0,
                 previous: Some(state_ptr),
+                steps: 1,
             },
         ];
     }
@@ -99,6 +124,7 @@ fn neighbors(input: &[Vec<u32>], state: &State) -> Vec<State> {
                 cost: u64::MAX,
                 forward_steps: state.forward_steps + 1,
                 previous: Some(state_ptr.clone()),
+                steps: state.steps + 1,
             });
         }
     }
@@ -113,6 +139,7 @@ fn neighbors(input: &[Vec<u32>], state: &State) -> Vec<State> {
                 cost: u64::MAX,
                 forward_steps: 0,
                 previous: Some(state_ptr.clone()),
+                steps: state.steps + 1,
             });
         }
         let down = (state.position.0, state.position.1 as isize + 1);
@@ -123,6 +150,7 @@ fn neighbors(input: &[Vec<u32>], state: &State) -> Vec<State> {
                 cost: u64::MAX,
                 forward_steps: 0,
                 previous: Some(state_ptr.clone()),
+                steps: state.steps + 1,
             });
         }
     } else {
@@ -135,6 +163,7 @@ fn neighbors(input: &[Vec<u32>], state: &State) -> Vec<State> {
                 cost: u64::MAX,
                 forward_steps: 0,
                 previous: Some(state_ptr.clone()),
+                steps: state.steps + 1,
             });
         }
         let right = (state.position.0 as isize + 1, state.position.1);
@@ -145,6 +174,7 @@ fn neighbors(input: &[Vec<u32>], state: &State) -> Vec<State> {
                 cost: u64::MAX,
                 forward_steps: 0,
                 previous: Some(state_ptr.clone()),
+                steps: state.steps + 1,
             });
         }
     }
@@ -152,24 +182,26 @@ fn neighbors(input: &[Vec<u32>], state: &State) -> Vec<State> {
     neighbors
 }
 
+#[derive(Debug, PartialEq, Eq, Hash)]
+enum Direction {
+    North = 0,
+    East,
+    South,
+    West,
+}
+
 fn a_star(input: &[Vec<u32>], start: (usize, usize), end: (usize, usize)) -> Option<State> {
     let mut open = BinaryHeap::<Reverse<State>>::new();
     open.push(Reverse(State {
-        cost: 0,
+        cost: input[start.1][start.0] as u64,
         position: start,
         forward_steps: 0,
         previous: None,
         priority: 0,
+        steps: 0,
     }));
-    let mut closed = HashMap::<(usize, usize), State>::new();
-
-    let avg = {
-        let vec = input
-            .iter()
-            .flatten()
-            .collect_vec();
-        vec.iter().cloned().sum::<u32>() / vec.len() as u32
-    };
+    let mut closed = HashMap::<(Direction, (usize, usize)), State>::new();
+    let mut possible_solution: Option<State> = None;
 
     while let Some(current) = open.pop() {
         let current = current.0;
@@ -178,15 +210,29 @@ fn a_star(input: &[Vec<u32>], start: (usize, usize), end: (usize, usize)) -> Opt
         for neighbor in &mut neighbors {
             neighbor.previous = Some(Rc::new(RefCell::new(current.clone())));
             neighbor.cost = current.cost + input[neighbor.position.1][neighbor.position.0] as u64;
-            neighbor.priority = neighbor.cost
-                + distance(neighbor.position, end)
-                + (neighbor.forward_steps as u64 * (avg - 1) as u64);
+            neighbor.priority = neighbor.cost + distance(neighbor.position, end);
 
-            if neighbor.position == end {
-                return Some(neighbor.clone());
+            if possible_solution
+                .as_ref()
+                .map(|s| s.cost < neighbor.steps || s.cost < neighbor.cost)
+                .unwrap_or(false)
+            {
+                // We've definitely found a solution that is better than this one.
+                continue;
             }
 
-            if let Some(s) = closed.get(&neighbor.position) {
+            if neighbor.position == end {
+                if possible_solution
+                    .as_ref()
+                    .map(|s| s.cost > neighbor.cost)
+                    .unwrap_or(true)
+                {
+                    possible_solution = Some(neighbor.clone());
+                }
+                continue;
+            }
+
+            if let Some(s) = closed.get(&(neighbor.came_from_direction(), neighbor.position)) {
                 // Already gone through this node
                 if s.priority < neighbor.priority {
                     continue;
@@ -196,10 +242,10 @@ fn a_star(input: &[Vec<u32>], start: (usize, usize), end: (usize, usize)) -> Opt
             open.push(Reverse(neighbor.clone()));
         }
 
-        closed.insert(current.position, current);
+        closed.insert((current.came_from_direction(), current.position), current);
     }
 
-    None
+    possible_solution
 }
 
 fn shortest_path(input: &[Vec<u32>]) -> u64 {
