@@ -278,7 +278,7 @@ fn shortest_path(input: &[Vec<u32>], min: u8, max: u8) -> u64 {
 
 pub fn part_one(_args: Args) {
     let input = input();
-    println!("Cost: {}", shortest_path(&input, 0, 3));
+    println!("Cost: {}", shortest_path(&input, 1, 3));
 }
 pub fn part_two(_args: Args) {
     let input = input();
