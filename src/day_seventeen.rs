@@ -73,7 +73,7 @@ impl Ord for State {
     }
 }
 
-fn neighbors(input: &[Vec<u32>], state: &State) -> [Option<State>; 3] {
+fn neighbors(input: &[Vec<u32>], state: &State, min: u8, max: u8) -> [Option<State>; 3] {
     let previous = Some(Box::new(state.clone()));
     let max_x = input[0].len() - 1;
     let max_y = input.len() - 1;
@@ -81,7 +81,7 @@ fn neighbors(input: &[Vec<u32>], state: &State) -> [Option<State>; 3] {
     let (diff_x, diff_y) = state.came_from.forward();
 
     let mut neighbors = [None, None, None];
-    if state.forward_steps < 2 {
+    if state.forward_steps < max - 1 {
         // Move forward
         let forward = (
             state.position.0 as isize + diff_x,
@@ -103,6 +103,12 @@ fn neighbors(input: &[Vec<u32>], state: &State) -> [Option<State>; 3] {
                 previous: previous.clone(),
             });
         }
+    }
+
+    let can_turn = state.forward_steps >= min - 1;
+
+    if !can_turn {
+        return neighbors;
     }
 
     if diff_x != 0 {
@@ -188,7 +194,13 @@ impl Direction {
     }
 }
 
-fn a_star(input: &[Vec<u32>], start: (usize, usize), end: (usize, usize)) -> State {
+fn a_star(
+    input: &[Vec<u32>],
+    start: (usize, usize),
+    end: (usize, usize),
+    min: u8,
+    max: u8,
+) -> State {
     let capacity = 4 * 4 * input.len() * input[0].len();
     let mut open = BinaryHeap::with_capacity(capacity * 5);
     open.push(Reverse(State {
@@ -218,7 +230,9 @@ fn a_star(input: &[Vec<u32>], start: (usize, usize), end: (usize, usize)) -> Sta
             }
         }
 
-        let neighbors = neighbors(input, &current).into_iter().filter_map(|s| s);
+        let neighbors = neighbors(input, &current, min, max)
+            .into_iter()
+            .filter_map(|s| s);
         for mut neighbor in neighbors {
             // neighbor.previous = Some(Rc::new(RefCell::new(current.clone())));
             neighbor.cost = current.cost + input[neighbor.position.1][neighbor.position.0] as u64;
@@ -234,9 +248,9 @@ fn a_star(input: &[Vec<u32>], start: (usize, usize), end: (usize, usize)) -> Sta
     unreachable!()
 }
 
-fn shortest_path(input: &[Vec<u32>]) -> u64 {
+fn shortest_path(input: &[Vec<u32>], min: u8, max: u8) -> u64 {
     let ending_position = (input[0].len() - 1, input.len() - 1);
-    let state = a_star(input, (0, 0), ending_position);
+    let state = a_star(input, (0, 0), ending_position, min, max);
 
     let mut path = vec![state.position];
     let mut current = state.previous.clone();
@@ -264,6 +278,9 @@ fn shortest_path(input: &[Vec<u32>]) -> u64 {
 
 pub fn part_one(_args: Args) {
     let input = input();
-    println!("Cost: {}", shortest_path(&input));
+    println!("Cost: {}", shortest_path(&input, 0, 3));
 }
-pub fn part_two(_args: Args) {}
+pub fn part_two(_args: Args) {
+    let input = input();
+    println!("Cost: {}", shortest_path(&input, 4, 10));
+}
