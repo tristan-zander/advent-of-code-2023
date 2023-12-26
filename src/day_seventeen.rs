@@ -251,9 +251,9 @@ fn shortest_path(input: &[Vec<u32>]) -> u64 {
     for y in 0..input.len() {
         for x in 0..input[0].len() {
             if path.contains(&(x, y)) {
-                print!(" = ");
+                print!("=");
             } else {
-                print!(" . ");
+                print!(".");
             }
         }
         print!("\n");
