@@ -5,6 +5,7 @@ use macros::solutions;
 extern crate anyhow;
 
 mod day_eight;
+mod day_eighteen;
 mod day_eleven;
 mod day_fifteen;
 mod day_five;
@@ -51,6 +52,7 @@ const SOLUTIONS: phf::Map<&'static str, Solution> = solutions![
     mod day_fifteen;
     mod day_sixteen;
     mod day_seventeen;
+    mod day_eighteen;
 ];
 
 fn main() {
