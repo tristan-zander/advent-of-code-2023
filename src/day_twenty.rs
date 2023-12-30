@@ -1,12 +1,19 @@
-use std::{cell::RefCell, collections::{HashMap, VecDeque}, ops::Not, rc::Rc, str::FromStr};
+use std::{
+    cell::RefCell,
+    collections::{HashMap, VecDeque},
+    ops::Not,
+    rc::Rc,
+    str::FromStr,
+};
 
 use itertools::Itertools;
+use num::Integer;
 
 use crate::Args;
 
 const FILE_CONTENTS: &'static str = include_str!("../inputs/day_twenty.txt");
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[repr(u8)]
 enum Pulse {
     Low = 0,
@@ -36,11 +43,13 @@ enum Module {
     FlipFlop {
         name: String,
         state: FlipFlop,
+        last_pulse: Option<Pulse>,
         outputs: Box<[String]>,
     },
     Conjunction {
         name: String,
         previous_inputs: HashMap<String, Pulse>,
+        last_pulse: Option<Pulse>,
         outputs: Box<[String]>,
     },
     Broadcaster {
@@ -55,11 +64,13 @@ impl Module {
                 name,
                 state: _,
                 outputs: _,
+                last_pulse: _,
             } => name.to_owned(),
             Module::Conjunction {
                 name,
                 previous_inputs: _,
                 outputs: _,
+                last_pulse: _,
             } => name.to_owned(),
             Module::Broadcaster { outputs: _ } => "broadcaster".to_owned(),
         }
@@ -71,11 +82,13 @@ impl Module {
                 name: _,
                 state: _,
                 outputs,
+                last_pulse: _,
             } => outputs.as_ref(),
             Module::Conjunction {
                 name: _,
                 previous_inputs: _,
                 outputs,
+                last_pulse: _,
             } => outputs.as_ref(),
             Module::Broadcaster { outputs } => outputs.as_ref(),
         }
@@ -87,29 +100,56 @@ impl Module {
                 name: _,
                 state,
                 outputs: _,
+                last_pulse,
             } => {
                 if !matches!(pulse, Pulse::Low) {
+                    *last_pulse = None;
                     return None;
                 }
 
                 *state = !*state;
                 let pulse = *state as u8;
                 // SAFETY: I'm ensuring that FlipFlop's On/Off variants are the same as Pulse's High/Low variants
-                return Some(unsafe { std::mem::transmute(pulse) });
+                let pulse = Some(unsafe { std::mem::transmute(pulse) });
+                *last_pulse = pulse;
+                return pulse;
             }
             Module::Conjunction {
                 name: _,
                 previous_inputs,
                 outputs: _,
+                last_pulse,
             } => {
                 previous_inputs.insert(name, pulse);
 
                 if previous_inputs.values().all(|v| matches!(v, Pulse::High)) {
-                    return Some(Pulse::Low);
+                    let pulse = Some(Pulse::Low);
+                    *last_pulse = pulse;
+                    return pulse;
                 }
-                return Some(Pulse::High);
+                let pulse = Some(Pulse::High);
+                *last_pulse = pulse;
+                return pulse;
             }
             Module::Broadcaster { outputs: _ } => Some(pulse),
+        }
+    }
+
+    pub fn last_pulse(&self) -> Option<Pulse> {
+        match self {
+            Module::FlipFlop {
+                name: _,
+                state: _,
+                outputs: _,
+                last_pulse,
+            } => *last_pulse,
+            Module::Conjunction {
+                name: _,
+                previous_inputs: _,
+                outputs: _,
+                last_pulse,
+            } => *last_pulse,
+            Module::Broadcaster { outputs: _ } => Some(Pulse::Low),
         }
     }
 }
@@ -132,11 +172,13 @@ impl FromStr for Module {
                 name,
                 state: FlipFlop::Off,
                 outputs,
+                last_pulse: None,
             }),
             '&' => Ok(Module::Conjunction {
                 name,
                 previous_inputs: HashMap::new(),
                 outputs,
+                last_pulse: None,
             }),
             _ => unreachable!(),
         }
@@ -164,6 +206,7 @@ fn input() -> HashMap<String, Rc<RefCell<Module>>> {
                     name: _,
                     previous_inputs,
                     outputs: _,
+                    last_pulse: _,
                 } => {
                     previous_inputs.insert(name.to_owned(), Pulse::Low);
                 }
@@ -175,7 +218,7 @@ fn input() -> HashMap<String, Rc<RefCell<Module>>> {
     modules
 }
 
-fn press_button(input: &mut HashMap<String, Rc<RefCell<Module>>>) -> (usize, usize, bool) {
+fn press_button(input: &mut HashMap<String, Rc<RefCell<Module>>>) -> (usize, usize) {
     let mut modules = VecDeque::new();
     modules.push_front((Pulse::Low, input.get("broadcaster").unwrap().clone()));
 
@@ -183,20 +226,16 @@ fn press_button(input: &mut HashMap<String, Rc<RefCell<Module>>>) -> (usize, usi
     // Low starts at one because the button push counts as a low
     let mut low_pulse_counter = 1;
 
-    let mut hit_rx = false;
-
     while let Some((output_pulse, module)) = modules.pop_front() {
-        let name = module.borrow().name();
-        for output in module.borrow().outputs() {
+        let module = module.as_ref().borrow();
+        let name = module.name();
+        for output in module.outputs() {
             match output_pulse {
                 Pulse::Low => low_pulse_counter += 1,
                 Pulse::High => high_pulse_counter += 1,
             }
             let output_module_rc = input.get_mut(output);
             if output_module_rc.is_none() {
-                if output.as_str() == "rx" && matches!(output_pulse, Pulse::Low) {
-                    hit_rx = true;
-                }
                 continue;
             }
             let output_module_rc = output_module_rc.unwrap().clone();
@@ -208,7 +247,7 @@ fn press_button(input: &mut HashMap<String, Rc<RefCell<Module>>>) -> (usize, usi
         }
     }
 
-    (high_pulse_counter, low_pulse_counter, hit_rx)
+    (high_pulse_counter, low_pulse_counter)
 }
 
 pub fn part_one(_args: Args) {
@@ -216,7 +255,7 @@ pub fn part_one(_args: Args) {
     let mut high_counter = 0;
     let mut low_counter = 0;
     for _ in 0..1000 {
-        let (high, low, _) = press_button(&mut input);
+        let (high, low) = press_button(&mut input);
         high_counter += high;
         low_counter += low;
     }
@@ -226,16 +265,39 @@ pub fn part_one(_args: Args) {
 
 pub fn part_two(_args: Args) {
     let mut input = input();
-    let mut presses = 0;
+    let mut presses: u64 = 0;
+
+    let mut outputs_to_gh = input
+        .iter()
+        .filter(|(_name, m)| {
+            let m = m.as_ref().borrow();
+            m.outputs().contains(&"gh".to_owned())
+        })
+        .map(|(n, m)| (n.to_owned(), m.to_owned()))
+        .collect::<HashMap<_, _>>();
+
+    let mut high_presses = HashMap::<String, u64>::new();
+
     loop {
         presses += 1;
-        if presses % 1000 == 0 {
-            println!("Pressing: {}", presses);
+        press_button(&mut input);
+
+        let keys = outputs_to_gh.keys().into_iter().cloned().collect_vec();
+        for name in keys {
+            let module = outputs_to_gh.get(&name).unwrap();
+            let module = module.as_ref().borrow();
+            let last_pulse = module.last_pulse();
+            if matches!(last_pulse, Some(Pulse::High)) {
+                println!("{} is high at: {}", name, presses);
+                drop(module);
+                outputs_to_gh.remove(&name);
+                high_presses.insert(name, presses);
+            }
         }
-        let (_, _, hit_rx) = press_button(&mut input);
-        if hit_rx {
+
+        if outputs_to_gh.len() == 0 {
             break;
         }
     }
-    println!("Answer: {}", presses);
+    println!("{}", high_presses.values().fold(1_u64, |acc, val| acc.lcm(&val)));
 }
