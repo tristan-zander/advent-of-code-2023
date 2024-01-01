@@ -13,6 +13,8 @@ use crate::Args;
 
 const FILE_CONTENTS: &'static str = include_str!("../inputs/day_twenty.txt");
 
+static mut PRESSES: u64 = 0;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[repr(u8)]
 enum Pulse {
@@ -51,6 +53,8 @@ enum Module {
         previous_inputs: HashMap<String, Pulse>,
         last_pulse: Option<Pulse>,
         outputs: Box<[String]>,
+        /// On what button presses did this module last pulse high?
+        high_pulses: Vec<u64>,
     },
     Broadcaster {
         outputs: Box<[String]>,
@@ -71,6 +75,7 @@ impl Module {
                 previous_inputs: _,
                 outputs: _,
                 last_pulse: _,
+                high_pulses: _,
             } => name.to_owned(),
             Module::Broadcaster { outputs: _ } => "broadcaster".to_owned(),
         }
@@ -89,6 +94,7 @@ impl Module {
                 previous_inputs: _,
                 outputs,
                 last_pulse: _,
+                high_pulses: _,
             } => outputs.as_ref(),
             Module::Broadcaster { outputs } => outputs.as_ref(),
         }
@@ -119,6 +125,7 @@ impl Module {
                 previous_inputs,
                 outputs: _,
                 last_pulse,
+                high_pulses,
             } => {
                 previous_inputs.insert(name, pulse);
 
@@ -128,28 +135,12 @@ impl Module {
                     return pulse;
                 }
                 let pulse = Some(Pulse::High);
+                // SAFETY: This application is not multi-threaded, so multiple accesses to this static variable will not happen.
+                high_pulses.push(unsafe { PRESSES });
                 *last_pulse = pulse;
                 return pulse;
             }
             Module::Broadcaster { outputs: _ } => Some(pulse),
-        }
-    }
-
-    pub fn last_pulse(&self) -> Option<Pulse> {
-        match self {
-            Module::FlipFlop {
-                name: _,
-                state: _,
-                outputs: _,
-                last_pulse,
-            } => *last_pulse,
-            Module::Conjunction {
-                name: _,
-                previous_inputs: _,
-                outputs: _,
-                last_pulse,
-            } => *last_pulse,
-            Module::Broadcaster { outputs: _ } => Some(Pulse::Low),
         }
     }
 }
@@ -179,6 +170,7 @@ impl FromStr for Module {
                 previous_inputs: HashMap::new(),
                 outputs,
                 last_pulse: None,
+                high_pulses: Vec::new(),
             }),
             _ => unreachable!(),
         }
@@ -207,6 +199,7 @@ fn input() -> HashMap<String, Rc<RefCell<Module>>> {
                     previous_inputs,
                     outputs: _,
                     last_pulse: _,
+                    high_pulses: _,
                 } => {
                     previous_inputs.insert(name.to_owned(), Pulse::Low);
                 }
@@ -265,9 +258,8 @@ pub fn part_one(_args: Args) {
 
 pub fn part_two(_args: Args) {
     let mut input = input();
-    let mut presses: u64 = 0;
 
-    let mut outputs_to_gh = input
+    let outputs_to_gh = input
         .iter()
         .filter(|(_name, m)| {
             let m = m.as_ref().borrow();
@@ -276,28 +268,48 @@ pub fn part_two(_args: Args) {
         .map(|(n, m)| (n.to_owned(), m.to_owned()))
         .collect::<HashMap<_, _>>();
 
-    let mut high_presses = HashMap::<String, u64>::new();
-
-    loop {
-        presses += 1;
+    for _ in 0..100_000 {
+        // SAFETY: This application is not multi-threaded, so multiple accesses to this static variable will not happen.
+        unsafe { PRESSES += 1 };
         press_button(&mut input);
-
-        let keys = outputs_to_gh.keys().into_iter().cloned().collect_vec();
-        for name in keys {
-            let module = outputs_to_gh.get(&name).unwrap();
-            let module = module.as_ref().borrow();
-            let last_pulse = module.last_pulse();
-            if matches!(last_pulse, Some(Pulse::High)) {
-                println!("{} is high at: {}", name, presses);
-                drop(module);
-                outputs_to_gh.remove(&name);
-                high_presses.insert(name, presses);
-            }
-        }
-
-        if outputs_to_gh.len() == 0 {
-            break;
-        }
     }
-    println!("{}", high_presses.values().fold(1_u64, |acc, val| acc.lcm(&val)));
+
+    println!(
+        "{:#?}",
+        outputs_to_gh
+            .iter()
+            .filter_map(|(k, m)| {
+                let m = m.as_ref().borrow();
+                return match &*m {
+                    Module::Conjunction {
+                        name: _,
+                        previous_inputs: _,
+                        last_pulse: _,
+                        outputs: _,
+                        high_pulses,
+                    } => Some((k, high_pulses.to_owned())),
+                    _ => None,
+                };
+            })
+            .collect::<HashMap<_, _>>()
+    );
+
+    let pulses_till_all_high = outputs_to_gh
+        .values()
+        .filter_map(|m| {
+            let m = m.as_ref().borrow();
+            return match &*m {
+                Module::Conjunction {
+                    name: _,
+                    previous_inputs: _,
+                    last_pulse: _,
+                    outputs: _,
+                    high_pulses,
+                } => Some(high_pulses.to_owned()),
+                _ => None,
+            };
+        })
+        .fold(1u64, |acc, v| acc.lcm(&v[0]));
+
+    println!("Pulses till all high: {}", pulses_till_all_high);
 }
